@@ -3,5 +3,7 @@
         "cloudinary",
         "coverimage",
         "fullname"
-    ]
+    ],
+    "pieces.cloudCapabilities": "Blended",
+    "pieces.telemetry": true
 }

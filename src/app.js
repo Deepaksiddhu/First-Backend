@@ -22,4 +22,14 @@ app.use(express.urlencoded({
 app.use(express.static('public'));
 
 
+//*routes import
+
+import userRout from './routes/user.routes.js';
+
+
+//*Routes declaration
+app.use("/api/v1/users",userRout);
+
+//*http://localhost:8000/api/v1/users/register
+
 export {app};
