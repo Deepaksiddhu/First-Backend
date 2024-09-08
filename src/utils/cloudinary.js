@@ -7,7 +7,7 @@ import fs from "fs";
     // Configuration
     cloudinary.config({ 
         cloud_name:process.env.CLOUDINARY_CLOUD_NAME, 
-        api_key: process.env.CLOUDINARY_CLOUD_API_KEY, 
+        api_key: process.env.CLOUDINARY_API_KEY, 
         api_secret:process.env.CLOUDINARY_API_SECRET 
     });
 
@@ -19,14 +19,19 @@ import fs from "fs";
             //upload the file on Cloudinary
             const response = await cloudinary.uploader.upload(localFilePath,{
                 resource_type:"auto",
+                
             });
             //file uploaded successfully
             console.log("File uploaded successfully and int the response all these are :=>",response);
-            console.log("File uploaded successfully",response.url);
+            console.log("File uploaded successfully",response);
+            // console.log("LOCAL FILE PATH =>",localFilePath);
+            fs.unlinkSync(localFilePath); //remove the locally saved temporary file
             return response;
             
         } catch (error) {
+            console.log("Error while uploading file on Cloudinary",error);
             fs.unlinkSync(localFilePath); //remove the locally saved temporary file as the uploaded operation got failed
+            return null;
         }
     }
 
