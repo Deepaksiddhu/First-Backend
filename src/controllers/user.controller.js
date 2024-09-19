@@ -4,6 +4,7 @@ import {User} from '../models/user.model.js';
 import {uploadOnCloudinary} from '../utils/cloudinary.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import jwt from "jsonwebtoken";
+import mongoose from 'mongoose';
 
 
 
@@ -331,22 +332,63 @@ const updateUserAvatar = asyncHandler(async(req,res)=>{
         throw new ApiError(400,"Avatar file is missing")
     }
 
+
+    //TODO: Delet old image Assignment
+    const user = await User.findById(req.user?._id)
+
+    if (!user) {
+        throw new ApiError(404,"User not found")
+    }
+
+//Store the old avatar URL before updating
+
+    const oldAvatarUrl = user.avatar;
+
+
     const avatar = await uploadOnCloudinary(avatarLocalPath)
 
     if (!avatar.url) {
         throw new ApiError(400,"ERROR while uploading avatar")
     }
 
+    //Update user with new avatar URL
+    user.avatar = avatar.url;
+    await user.save({validateBeforeSave:false});
 
-    const user = await User.findByIdAndUpdate(
-        req.user?._id,
-        {
-            $set:{
-                avatar:avatar.url
+
+    //Delete old avatar from cloudinary
+    if(oldAvatarUrl)
+    {
+        const oldAvatarPublicId = getPublicIdFromUrl(oldAvatarUrl);
+
+        cloudinary.uploader.destroy(oldAvatarPublicId,(error,result)=>{
+            if(error)
+            {
+                console.error("Error deleting old avatar :",error)
             }
-        },
-        {new:true}
-    ).select("-password")
+            else{
+                console.log("Old avatar deleted successfully :",result);
+                
+            }
+        })
+    }
+
+
+    // const user = await User.findByIdAndUpdate(
+    //     req.user?._id,
+    //     {
+    //         $set:{
+    //             avatar:avatar.url
+    //         }
+    //     },
+    //     {new:true}
+    // ).select("-password")
+
+    // if(user.avatar)
+    // {
+    //     const oldAvatarUrl = user.avatar;
+
+    // }
 
 
     return res
@@ -365,6 +407,8 @@ const updateUserCoverImage = asyncHandler(async(req,res)=>{
         throw new ApiError(400,"CoverImage file is missing")
     }
 
+    //TODO: Delet old image Assignment
+    
     const coverImage = await uploadOnCloudinary(coverImageLocalPath)
 
     if (!coverImage.url) {
@@ -393,6 +437,84 @@ const updateUserCoverImage = asyncHandler(async(req,res)=>{
 })
 
 
+
+const getUserChannelProfile = asyncHandler(async(req,res)=>{
+
+    const {username} = req.params;
+
+    if (!username.trim()) {
+        throw new ApiError(400,"Username is missing")
+    }
+
+    const channel= await User.aggregate([
+        {
+            $match:{
+                username:username?.toLowerCase()
+            }
+        },
+        {
+            $lookup:{
+                from:"subscriptions",
+                localField:"_id",
+                foreignField:"channel",
+                as:"subscribers"
+            }
+        },
+        {
+            $lookup:{
+                from:"subscriptions",
+                localField:"_id",
+                foreignField:"subscriber",
+                as:"subscribedTo"
+            }
+        },
+        {
+            $addFields:{
+                subscribersCount:{
+                    $size:"$subscribers"
+                },
+                channelsSubscribedToCount:{
+                    $size:"$subscribedTo"
+                },
+                isSubscribed:{
+                    $cond:{
+                        if:{$in: [req.user?._id, "$subscribers.subscriber"]},
+                        then:true,
+                        else:false
+                    }
+                }
+            }
+        },
+        {
+            $project:{
+                fullName:1,
+                username:1,
+                subscribersCount:1,
+                channelsSubscribedToCount:1,
+                isSubscribed:1,
+                avatar:1,
+                coverImage:1,
+                email:1,
+            }
+        }
+    ])
+
+
+    if (!channel?.length) {
+        throw new ApiError(404,"channel does not exist")
+    }
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, channel[0],"User Channel fetched successfully")
+    )
+})
+
+
+
+
+
 export {
     registerUser,
     loginUser,
@@ -402,5 +524,7 @@ export {
     getCurrentUser,
     updateAccountDetails,
     updateUserAvatar,
-    updateUserCoverImage
+    updateUserCoverImage,
+    getUserChannelProfile,
+
 };
